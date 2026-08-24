@@ -1,0 +1,19 @@
+# Third-party SDK drop (fetch per README; never committed)
+vendor/
+
+# Build residue + output (binaries ship via GitHub Releases)
+*.obj
+*.res
+*.lib
+*.exp
+*.dll
+*.pdb
+*.ilk
+xtensions/
+
+# Runtime settings written next to the deployed DLL (query history, cap)
+*.cfg
+
+# Local-only notes
+CLAUDE.md
+*.local.md

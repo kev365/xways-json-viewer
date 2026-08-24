@@ -1,0 +1,5 @@
+#include "resource.h"
+
+// Embedded page + JMESPath engine (single-DLL deploy; no sidecar files).
+IDR_VIEWER_HTML  RCDATA  "ui\viewer.html"
+IDR_JMESPATH_JS  RCDATA  "ui\jmespath.js"

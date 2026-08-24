@@ -1,0 +1,15 @@
+; Module definition for xways-json-viewer.dll — a VIEWER X-Tension.
+;
+; Only the viewer surface is exported. XT_Prepare / XT_ProcessItem(Ex) /
+; XT_Finalize are deliberately absent: when loaded as a viewer X-Tension
+; X-Ways never calls them anyway, and leaving them out keeps the DLL from
+; appearing to do something under Tools | Run X-Tensions.
+;
+; XT_ReleaseMem is MANDATORY whenever XT_View is exported.
+LIBRARY xways-json-viewer
+EXPORTS
+    XT_Init
+    XT_About
+    XT_View
+    XT_ReleaseMem
+    XT_Done

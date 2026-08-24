@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>xways-json-viewer</title>
+<style>
+  :root { --fg:#000; --bg:#fff; --muted:#666; --bar:#f3f3f3; --line:#d0d0d0; --key:#800080; --str:#0000c0; --num:#b00000; --bool:#008000; --nul:#808080; --err:#c00; --hit:#ffe9a8; }
+  html,body { height:100%; margin:0; background:var(--bg); color:var(--fg); font-family:Consolas,'Courier New',monospace; font-size:12px; }
+  body { display:flex; flex-direction:column; }
+  #bar { flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:4px 6px; background:var(--bar); border-bottom:1px solid var(--line); font-family:'Segoe UI',Arial,sans-serif; font-size:11px; }
+  #q { flex:1 1 auto; font-family:Consolas,monospace; font-size:12px; padding:3px 5px; border:1px solid #999; }
+  #q.err { border-color:var(--err); background:#fff3f3; }
+  #status { flex:0 0 auto; color:var(--muted); white-space:nowrap; max-width:40%; overflow:hidden; text-overflow:ellipsis; }
+  #status.err { color:var(--err); font-weight:bold; }
+  button,label,select { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; }
+  label { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+  button { padding:2px 8px; }
+  button.on { background:#dbe8ff; border:1px solid #5b8def; }
+  #meta { flex:0 0 auto; padding:2px 6px; color:var(--muted); font-family:'Segoe UI',Arial,sans-serif; font-size:11px; border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #meta .warn { color:#900; background:#ffc; padding:0 4px; }
+  #view { flex:1 1 auto; overflow:auto; padding:4px 6px; }
+  pre { margin:0; white-space:pre-wrap; word-wrap:break-word; }
+  .n { padding-left:1.2em; }
+  .row { white-space:nowrap; line-height:1.35; }
+  .tg { display:inline-block; width:1em; color:var(--muted); cursor:pointer; user-select:none; }
+  .tg.leaf { cursor:default; }
+  .k { color:var(--key); font-weight:bold; }
+  .s { color:var(--str); }
+  .d { color:var(--num); }
+  .b { color:var(--bool); }
+  .z { color:var(--nul); font-style:italic; }
+  .br { color:var(--muted); }
+  .cnt { color:var(--muted); font-size:10px; margin-left:.4em; }
+  .more { color:#0645ad; cursor:pointer; text-decoration:underline; margin-left:1.2em; }
+  .errbox { color:var(--err); background:#fdd; padding:4px 6px; margin-bottom:4px; font-family:'Segoe UI',Arial,sans-serif; font-size:11px; }
+  #help { display:none; position:absolute; right:8px; top:28px; width:420px; background:#fffbe6; border:1px solid #c9b458; padding:8px 10px; font-family:'Segoe UI',Arial,sans-serif; font-size:11px; z-index:9; box-shadow:2px 2px 6px rgba(0,0,0,.25); }
+  #help code { background:#fff; border:1px solid #ddd; padding:0 3px; }
+  #help.show { display:block; }
+  #histBtn { padding:2px 6px; }
+  #histPanel { display:none; position:absolute; left:70px; right:8px; top:28px; max-height:320px; overflow-y:auto; background:#fff; border:1px solid #999; box-shadow:2px 2px 8px rgba(0,0,0,.3); z-index:8; font-family:Consolas,monospace; font-size:12px; }
+  #histPanel.show { display:block; }
+  #histPanel .hgroup { font-family:'Segoe UI',Arial,sans-serif; font-size:10px; color:#666; background:#f3f3f3; padding:2px 8px; border-bottom:1px solid #e0e0e0; position:sticky; top:0; }
+  #histPanel .hrow { display:flex; gap:10px; padding:3px 8px; cursor:pointer; border-bottom:1px solid #f0f0f0; align-items:baseline; }
+  #histPanel .hrow:hover { background:#eef4ff; }
+  #histPanel .hq { flex:1 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #histPanel .hf { flex:0 0 auto; max-width:35%; color:#888; font-family:'Segoe UI',Arial,sans-serif; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #histPanel .hempty { padding:6px 8px; color:#888; font-family:'Segoe UI',Arial,sans-serif; font-size:11px; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span>JMESPath</span>
+  <input id="q" type="text" spellcheck="false" placeholder="e.g.  people[?age > `30`].name   —   empty = whole document. Esc clears." autocomplete="off">
+  <button id="histBtn" title="Query history (queries that return data are saved automatically)">▾</button>
+  <button id="clear" title="Clear the query (Esc)">✕</button>
+  <span id="status">ready</span>
+  <button id="tabTree" class="on" title="Collapsible tree">Tree</button>
+  <button id="tabText" title="Pretty-printed text (select + Ctrl+C)">Text</button>
+  <label title="Line-delimited JSON: parse each line as its own record and query them as one array"><input id="jsonl" type="checkbox"> JSONL</label>
+  <select id="cap" title="Render cap: how much of the file is read into the viewer. Bigger caps mean slower parsing and more memory — X-Ways is blocked while the file is read, so don't go crazy. Applies from the next file selection.">
+    <option value="8388608">8 MiB</option>
+    <option value="33554432">32 MiB</option>
+    <option value="134217728">128 MiB</option>
+    <option value="536870912">512 MiB</option>
+  </select>
+  <button id="helpBtn" title="JMESPath cheat sheet">?</button>
+</div>
+<div id="histPanel"></div>
+<div id="meta">waiting for X-Ways…</div>
+<div id="help">
+  <b>JMESPath quick reference</b> (<span style="color:#555">jmespath.org</span>)<br>
+  <code>a.b.c</code> nested key &nbsp; <code>list[0]</code> index &nbsp; <code>list[-1]</code> last &nbsp; <code>list[*].name</code> projection<br>
+  <code>list[?status == `500`]</code> filter (numbers/booleans in backticks, strings in single quotes)<br>
+  <code>list[?contains(url, 'login')]</code> &nbsp; <code>list[?starts_with(host, 'h0')]</code><br>
+  <code>list[*].{h: host, s: status}</code> reshape &nbsp; <code>[a, b.c]</code> multiselect list<br>
+  <code>length(list)</code> &nbsp; <code>keys(obj)</code> &nbsp; <code>values(obj)</code> &nbsp; <code>sort_by(list, &amp;bytes)</code> &nbsp; <code>max_by(list, &amp;bytes)</code><br>
+  <code>list[*].status | sort(@)</code> pipe &nbsp; <code>to_string(x)</code> &nbsp; <code>join(', ', list[*].name)</code><br>
+  <code>list[].tags[]</code> flatten &nbsp; <code>*.name</code> object values &nbsp; <code>@</code> current node
+</div>
+<div id="view"><pre></pre></div>
+
+<script>
+/*JMESPATH*/
+</script>
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const q = $('q'), status = $('status'), view = $('view'), meta = $('meta');
+  const tabTree = $('tabTree'), tabText = $('tabText'), jsonlBox = $('jsonl');
+  const host = window.chrome && window.chrome.webview;
+
+  let doc = null;            // parsed document (or array of records for JSONL)
+  let parseErrors = [];      // JSONL per-line errors
+  let docText = '';          // raw text (for re-parse when JSONL toggles)
+  let result;                // last query result
+  let mode = 'tree';
+  let timer = null;
+  let lastCommitted = '', lastOk = '', curFile = '';
+  let hist = [];            // [{f, q}], most recent first
+  let commitTimer = null;
+  function commit(fileOverride) {
+    const f = fileOverride !== undefined ? fileOverride : curFile;
+    if (lastOk && lastOk === q.value.trim() && lastOk !== lastCommitted) {
+      lastCommitted = lastOk;
+      send('hist\t' + f + '\t' + lastOk);
+      addHist(f, lastOk);
+    }
+  }
+  function addHist(f, x) {
+    hist = hist.filter(e => !(e.q === x && e.f === f));
+    hist.unshift({ f: f, q: x });
+    if ($('histPanel').classList.contains('show')) renderHist();
+  }
+  function renderHist() {
+    const pnl = $('histPanel');
+    pnl.innerHTML = '';
+    const mk = (label, list) => {
+      if (!list.length) return;
+      const g = document.createElement('div'); g.className = 'hgroup'; g.textContent = label; pnl.appendChild(g);
+      for (const e of list) {
+        const r = document.createElement('div'); r.className = 'hrow';
+        const a = document.createElement('span'); a.className = 'hq'; a.textContent = e.q; a.title = e.q;
+        const b = document.createElement('span'); b.className = 'hf'; b.textContent = e.f; b.title = e.f;
+        r.appendChild(a); r.appendChild(b);
+        r.onclick = () => { q.value = e.q; pnl.classList.remove('show'); clearTimeout(timer); run(); commit(); q.focus(); };
+        pnl.appendChild(r);
+      }
+    };
+    mk('This file — ' + curFile, hist.filter(e => e.f === curFile));
+    mk('Other files', hist.filter(e => e.f !== curFile));
+    if (!hist.length) { const d = document.createElement('div'); d.className = 'hempty'; d.textContent = 'No saved queries yet — a query is saved automatically once it runs without an error.'; pnl.appendChild(d); }
+  }
+
+  function send(s) { try { if (host) host.postMessage(s); } catch (e) {} }
+  function log(s) { send('log\t' + s); }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  // ---- parsing -------------------------------------------------------------
+  function parseDoc() {
+    parseErrors = [];
+    if (jsonlBox.checked) {
+      const out = [];
+      const lines = docText.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        const ln = lines[i].trim();
+        if (!ln) continue;
+        try { out.push(JSON.parse(ln)); }
+        catch (e) { parseErrors.push('line ' + (i + 1) + ': ' + e.message); }
+      }
+      doc = out;
+      return true;
+    }
+    try { doc = JSON.parse(docText); return true; }
+    catch (e) {
+      doc = undefined;
+      parseErrors.push(e.message);
+      return false;
+    }
+  }
+
+  function autoDetectJsonl(text) {
+    // Multiple non-blank lines each starting with { or [ and a plain JSON.parse failing → JSONL.
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return false;
+    let looks = 0;
+    for (let i = 0; i < Math.min(lines.length, 20); i++) {
+      const c = lines[i].trim()[0];
+      if (c === '{' || c === '[') looks++;
+    }
+    if (looks < Math.min(lines.length, 20)) return false;
+    try { JSON.parse(text); return false; } catch (e) { return true; }
+  }
+
+  // ---- query -------------------------------------------------------------
+  function run() {
+    const expr = q.value.trim();
+    const t0 = performance.now();
+    q.classList.remove('err'); status.classList.remove('err');
+    if (doc === undefined) {
+      status.textContent = 'parse error';
+      status.classList.add('err');
+      render(undefined, parseErrors);
+      return;
+    }
+    try {
+      result = expr ? jmespath.search(doc, expr) : doc;
+    } catch (e) {
+      q.classList.add('err'); status.classList.add('err');
+      status.textContent = (e.message || String(e)).replace(/^.*?:\s*/, '').slice(0, 120);
+      status.title = e.message || String(e);
+      return;
+    }
+    // History-worthy = ran without error AND returned data (not null / empty array /
+    // empty object) — misses and typos never reach the history.
+    const hasData = result !== null && result !== undefined &&
+                    !(Array.isArray(result) && result.length === 0) &&
+                    !(typeof result === 'object' && !Array.isArray(result) && Object.keys(result).length === 0);
+    lastOk = (expr && hasData) ? expr : '';
+    clearTimeout(commitTimer);
+    if (lastOk) commitTimer = setTimeout(() => commit(), 3000);   // auto-save once the query settles
+    const ms = (performance.now() - t0).toFixed(1);
+    status.textContent = describe(result) + ' · ' + ms + ' ms';
+    status.title = status.textContent;
+    render(result, parseErrors);
+  }
+
+  function describe(v) {
+    if (Array.isArray(v)) return v.length + ' item' + (v.length === 1 ? '' : 's');
+    if (v === null) return 'null';
+    if (typeof v === 'object') return Object.keys(v).length + ' key' + (Object.keys(v).length === 1 ? '' : 's');
+    return typeof v;
+  }
+
+  function schedule() { clearTimeout(timer); timer = setTimeout(run, 150); }
+
+  // ---- rendering -----------------------------------------------------------
+  const CHUNK = 500, MAX_INLINE_STR = 200;
+
+  function render(v, errs) {
+    view.innerHTML = '';
+    if (errs && errs.length) {
+      const e = document.createElement('div');
+      e.className = 'errbox';
+      e.textContent = (jsonlBox.checked ? errs.length + ' line(s) skipped: ' : 'JSON parse error: ') + errs.slice(0, 5).join(' | ') + (errs.length > 5 ? ' …' : '');
+      view.appendChild(e);
+    }
+    if (v === undefined) return;
+    if (mode === 'text') {
+      const pre = document.createElement('pre');
+      let s;
+      try { s = JSON.stringify(v, null, 2); } catch (e) { s = String(v); }
+      if (s && s.length > 4e6) s = s.slice(0, 4e6) + '\n… (text truncated at 4 MB; narrow the query)';
+      pre.textContent = s === undefined ? 'undefined' : s;
+      view.appendChild(pre);
+      return;
+    }
+    const root = document.createElement('div');
+    root.appendChild(node(null, v, 0, true));
+    view.appendChild(root);
+  }
+
+  function scalarHtml(v) {
+    if (v === null) return '<span class="z">null</span>';
+    switch (typeof v) {
+      case 'string': {
+        const shown = v.length > MAX_INLINE_STR ? v.slice(0, MAX_INLINE_STR) + '…' : v;
+        return '<span class="s" title="' + esc(v.length > MAX_INLINE_STR ? v.slice(0, 2000) : '') + '">"' + esc(shown) + '"</span>';
+      }
+      case 'number': return '<span class="d">' + v + '</span>';
+      case 'boolean': return '<span class="b">' + v + '</span>';
+      default: return '<span class="z">' + esc(String(v)) + '</span>';
+    }
+  }
+
+  // Lazy tree node: children rendered on first expand. depth<2 auto-expanded.
+  function node(key, v, depth, open) {
+    const el = document.createElement('div');
+    const isArr = Array.isArray(v), isObj = v !== null && typeof v === 'object';
+    const row = document.createElement('div');
+    row.className = 'row';
+    const keyHtml = key === null ? '' : (typeof key === 'number' ? '<span class="br">' + key + ': </span>' : '<span class="k">' + esc(key) + '</span><span class="br">: </span>');
+    if (!isObj) {
+      row.innerHTML = '<span class="tg leaf">&nbsp;</span>' + keyHtml + scalarHtml(v);
+      el.appendChild(row);
+      return el;
+    }
+    const n = isArr ? v.length : Object.keys(v).length;
+    const ob = isArr ? '[' : '{', cb = isArr ? ']' : '}';
+    row.innerHTML = '<span class="tg">' + (open ? '▾' : '▸') + '</span>' + keyHtml +
+      '<span class="br">' + ob + '</span><span class="cnt">' + n + (isArr ? ' items' : ' keys') + '</span>' +
+      '<span class="br closed">' + (open ? '' : ' … ' + cb) + '</span>';
+    el.appendChild(row);
+    const kids = document.createElement('div');
+    kids.className = 'n';
+    let built = false, shown = 0;
+    const keys = isArr ? null : Object.keys(v);
+    function more() {
+      const end = Math.min(n, shown + CHUNK);
+      const frag = document.createDocumentFragment();
+      for (let i = shown; i < end; i++) {
+        const k = isArr ? i : keys[i];
+        frag.appendChild(node(k, v[k], depth + 1, depth + 1 < 2 && n <= 50));
+      }
+      shown = end;
+      const old = kids.querySelector(':scope > .more'); if (old) old.remove();
+      kids.appendChild(frag);
+      if (shown < n) {
+        const m = document.createElement('div');
+        m.className = 'more';
+        m.textContent = 'show next ' + Math.min(CHUNK, n - shown) + ' of ' + (n - shown) + ' remaining';
+        m.onclick = more;
+        kids.appendChild(m);
+      }
+    }
+    const close = document.createElement('div');
+    close.className = 'row'; close.innerHTML = '<span class="tg leaf">&nbsp;</span><span class="br">' + cb + '</span>';
+    function setOpen(o) {
+      if (o && !built) { built = true; more(); }
+      kids.style.display = o ? '' : 'none';
+      close.style.display = o ? '' : 'none';
+      row.querySelector('.tg').textContent = o ? '▾' : '▸';
+      row.querySelector('.closed').textContent = o ? '' : ' … ' + cb;
+    }
+    row.querySelector('.tg').onclick = () => setOpen(kids.style.display === 'none');
+    el.appendChild(kids); el.appendChild(close);
+    setOpen(!!open);
+    return el;
+  }
+
+  // ---- UI wiring -----------------------------------------------------------
+  q.addEventListener('input', schedule);
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { clearTimeout(timer); run(); commit(); }
+    else if (e.key === 'Escape') { q.value = ''; run(); }
+  });
+  q.addEventListener('change', () => { clearTimeout(timer); run(); commit(); });
+  $('cap').onchange = () => { send('cap\t' + $('cap').value); status.textContent = 'cap saved — re-select the file to apply'; };
+  q.addEventListener('blur', () => commit());
+  $('clear').onclick = () => { q.value = ''; run(); q.focus(); };
+  $('histBtn').onclick = (e) => { e.stopPropagation(); renderHist(); $('histPanel').classList.toggle('show'); };
+  document.addEventListener('click', e => { if (!$('histPanel').contains(e.target)) $('histPanel').classList.remove('show'); });
+  tabTree.onclick = () => { mode = 'tree'; tabTree.classList.add('on'); tabText.classList.remove('on'); render(result, parseErrors); };
+  tabText.onclick = () => { mode = 'text'; tabText.classList.add('on'); tabTree.classList.remove('on'); render(result, parseErrors); };
+  jsonlBox.onchange = () => { parseDoc(); run(); };
+  $('helpBtn').onclick = () => $('help').classList.toggle('show');
+  document.addEventListener('click', e => { if (!$('help').contains(e.target) && e.target !== $('helpBtn')) $('help').classList.remove('show'); });
+
+  // ---- host messages -------------------------------------------------------
+  // Envelope: {name,itemId,size,typeDescr,encoding,truncated,isJsonl,pinnedQuery,text}
+  function onEnvelope(m) {
+    docText = m.text || '';
+    commit(curFile);                        // save the outgoing file's settled query
+    curFile = m.name || '';
+    lastCommitted = '';                     // same query may be re-saved against the new file
+    if (Array.isArray(m.history) && m.history.length) hist = m.history.map(e => ({ f: e.f || '', q: e.q || '' })).filter(e => e.q);
+    if (m.maxBytes) { const c = $('cap'); for (const o of c.options) if (+o.value === m.maxBytes) c.value = o.value; }
+    jsonlBox.checked = !!m.isJsonl || autoDetectJsonl(docText);
+    parseDoc();
+    meta.innerHTML = '<b>' + esc(m.name || '') + '</b> · item ' + m.itemId + ' · ' + esc(m.typeDescr || '') + ' · ' +
+      (m.size || 0).toLocaleString() + ' bytes · ' + esc(m.encoding || '') +
+      (m.truncated ? ' · <span class="warn">truncated to first ' + (m.maxBytes || 0).toLocaleString() + ' bytes</span>' : '') +
+      (jsonlBox.checked ? ' · JSONL (' + (doc ? doc.length : 0) + ' records)' : '');
+    run();
+    view.scrollTop = 0;
+  }
+
+  if (host) {
+    host.addEventListener('message', ev => {
+      let m = ev.data;
+      if (typeof m === 'string') { try { m = JSON.parse(m); } catch (e) { log('bad envelope: ' + e.message); return; } }
+      if (m && m.text !== undefined) onEnvelope(m);
+    });
+    send('ready\t');
+  } else {
+    meta.textContent = 'not hosted by X-Ways (no window.chrome.webview) — demo mode';
+    docText = '{"demo":true,"people":[{"name":"Ann","age":31},{"name":"Bob","age":27}]}';
+    parseDoc(); run();
+  }
+})();
+</script>
+</body>
+</html>
