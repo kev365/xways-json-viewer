@@ -6,6 +6,10 @@ JSON and JSONL files, rendered inside the Preview pane.
 > **Status: 0.1.0-beta** — works on X-Ways Forensics 21.8; interfaces may still
 > change before the first non-beta release.
 
+![JMESPath filter over a JSON file in the X-Ways preview pane](docs/jmespath-filter-view.png)
+
+![Collapsible tree of the whole document](docs/json-expanded-view.png)
+
 ## What it does
 
 - Claims JSON-ish files in Preview mode by X-Ways type (`JavaScript Object
