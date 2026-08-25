@@ -49,7 +49,7 @@ static const wchar_t* DESCRIPTION  = L"Viewer X-Tension: live JMESPath query ove
 static const wchar_t* REPORT_TABLE = L"Json-Viewer Findings";   // unused by a viewer; kept for convention
 
 // --- Logging verbosity ------------------------------------------------------
-static constexpr bool VERBOSE = true;
+static constexpr bool VERBOSE = false;
 // One-shot diagnostics that dump the pane's child windows per call — off now that the
 // z-order behaviour is understood (see README "How it works").
 static constexpr bool kDumpChildren = false;
