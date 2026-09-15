@@ -22,7 +22,7 @@ JSON and JSONL files, rendered inside the Preview pane.
     is kept when you move to the next file, so one expression can be checked
     against many files.
   - **Tree** view (collapsible, lazy, large arrays chunked) and **Text** view
-    (pretty-printed, selectable for copy).
+    (pretty-printed, select-able for copy).
   - **JSONL** mode (auto-detected for line-delimited files): each line becomes
     a record and the document an array, so filters like
     `` [?status == `500`].url `` work over logs.
@@ -37,7 +37,7 @@ JSON and JSONL files, rendered inside the Preview pane.
 
 ## Requirements
 
-- Windows x64, **X-Ways Forensics 21.x or newer** with a forensic licence
+- Windows x64, **X-Ways Forensics 21.x or newer** with a forensic license
   (viewer X-Tensions are not available in WinHex Lab Edition).
 - **Options → Viewer Programs → "Activate separate viewer component" must be
   ON.** Without it X-Ways still calls the X-Tension but never creates a preview
@@ -102,14 +102,13 @@ select-all / print. DevTools (Inspect) are enabled only in verbose builds
 
 - `ui/jmespath.js` — [jmespath.js](https://github.com/jmespath/jmespath.js),
   Apache License 2.0 (see `ui/jmespath.LICENSE`). Embedded unmodified.
-- WebView2 SDK — Microsoft, per its NuGet licence (not redistributed here).
+- WebView2 SDK — Microsoft, per its NuGet license (not redistributed here).
 
 ## Roadmap
 
 - [ ] Search / highlight inside the tree; copy-path on a node.
 - [ ] `.har` / `.ipynb` presets (pre-filled queries).
-- [ ] Per-row delete in the history panel.
-- [ ] Verify behaviour with two data windows open.
+- [ ] Timestamp and Base64 decoder
 
 ## Disclaimer
 
